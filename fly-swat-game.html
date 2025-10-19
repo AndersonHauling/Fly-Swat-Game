@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Fly Swatter Trash Game</title>
+  <style>
+    body { text-align: center; font-family: sans-serif; background-color: #f2f2f2; }
+    #gameArea {
+      position: relative;
+      width: 600px;
+      height: 400px;
+      margin: 20px auto;
+      background: url('https://i.imgur.com/3g7nmJC.png') repeat;
+      border: 2px solid #333;
+    }
+    .fly {
+      position: absolute;
+      width: 40px;
+      height: 40px;
+      background: url('https://i.imgur.com/4YzZxJv.png') no-repeat center center;
+      background-size: contain;
+      cursor: pointer;
+    }
+    #scoreBoard {
+      font-size: 1.5em;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Swat the Flies!</h1>
+  <div id="gameArea"></div>
+  <div id="scoreBoard">Score: 0</div>
+
+  <script>
+    let score = 0;
+    const gameArea = document.getElementById('gameArea');
+    const scoreBoard = document.getElementById('scoreBoard');
+
+    function spawnFly() {
+      const fly = document.createElement('div');
+      fly.className = 'fly';
+      fly.style.top = Math.random() * (gameArea.clientHeight - 40) + 'px';
+      fly.style.left = Math.random() * (gameArea.clientWidth - 40) + 'px';
+
+      fly.onclick = () => {
+        score += 100;
+        scoreBoard.innerText = 'Score: ' + score;
+        fly.remove();
+      };
+
+      gameArea.appendChild(fly);
+
+      setTimeout(() => {
+        if (gameArea.contains(fly)) fly.remove();
+      }, 2000); // fly disappears after 2 seconds
+    }
+
+    setInterval(spawnFly, 1000); // spawn a fly every second
+  </script>
+</body>
+</html>
