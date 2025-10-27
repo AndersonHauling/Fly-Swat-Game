@@ -1,61 +1,222 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Fly Swatter Trash Game</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Trash Swat Frenzy</title>
   <style>
-    body { text-align: center; font-family: sans-serif; background-color: #f2f2f2; }
-    #gameArea {
-      position: relative;
-      width: 600px;
-      height: 400px;
-      margin: 20px auto;
-      background: url('https://i.imgur.com/3g7nmJC.png') repeat;
-      border: 2px solid #333;
+    body {
+      margin: 0;
+      background: #222;
+      color: #fff;
+      font-family: sans-serif;
+      text-align: center;
     }
-    .fly {
-      position: absolute;
-      width: 40px;
-      height: 40px;
-      background: url('https://i.imgur.com/4YzZxJv.png') no-repeat center center;
-      background-size: contain;
-      cursor: pointer;
+    canvas {
+      background: #111;
+      display: block;
+      margin: 10px auto;
+      border: 2px solid #fff;
+      touch-action: manipulation;
     }
-    #scoreBoard {
-      font-size: 1.5em;
+    #score {
+      font-size: 24px;
       margin-top: 10px;
     }
   </style>
 </head>
 <body>
-  <h1>Swat the Flies!</h1>
-  <div id="gameArea"></div>
-  <div id="scoreBoard">Score: 0</div>
+  <h1>Trash Swat Frenzy</h1>
+  <div id="score">Score: 0</div>
+  <canvas id="gameCanvas" width="360" height="640"></canvas>
+
+  <!-- Sound Effects -->
+  <audio id="swatSound" src="swat.mp3"></audio>
+  <audio id="hitSound" src="hit.mp3"></audio>
+  <audio id="gameOverSound" src="gameover.mp3"></audio>
 
   <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const swatSound = document.getElementById('swatSound');
+    const hitSound = document.getElementById('hitSound');
+    const gameOverSound = document.getElementById('gameOverSound');
+
     let score = 0;
-    const gameArea = document.getElementById('gameArea');
-    const scoreBoard = document.getElementById('scoreBoard');
+    let trashBags = [];
+    let flies = [];
+    let maggots = [];
+    let gameOver = false;
 
-    function spawnFly() {
-      const fly = document.createElement('div');
-      fly.className = 'fly';
-      fly.style.top = Math.random() * (gameArea.clientHeight - 40) + 'px';
-      fly.style.left = Math.random() * (gameArea.clientWidth - 40) + 'px';
-
-      fly.onclick = () => {
-        score += 100;
-        scoreBoard.innerText = 'Score: ' + score;
-        fly.remove();
-      };
-
-      gameArea.appendChild(fly);
-
-      setTimeout(() => {
-        if (gameArea.contains(fly)) fly.remove();
-      }, 2000); // fly disappears after 2 seconds
+    class TrashBag {
+      constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.width = 80;
+        this.height = 100;
+        this.hits = 0;
+      }
+      draw() {
+        ctx.fillStyle = ['#555', '#777', '#999'][this.hits] || '#000';
+        ctx.fillRect(this.x, this.y, this.width, this.height);
+        if (this.hits > 0) {
+          ctx.fillStyle = '#ccc';
+          ctx.font = '20px sans-serif';
+          ctx.fillText('💥', this.x + 30, this.y + 50);
+        }
+      }
+      isHit(mx, my) {
+        return mx > this.x && mx < this.x + this.width &&
+               my > this.y && my < this.y + this.height;
+      }
     }
 
-    setInterval(spawnFly, 1000); // spawn a fly every second
+    class Fly {
+      constructor() {
+        this.x = Math.random() * canvas.width;
+        this.y = Math.random() * canvas.height;
+        this.size = 20;
+        this.angle = 0;
+      }
+      move() {
+        this.angle += 0.1;
+        this.x += Math.cos(this.angle) * 2;
+        this.y += Math.sin(this.angle) * 2;
+        this.wrap();
+      }
+      wrap() {
+        if (this.x < 0) this.x = canvas.width;
+        if (this.x > canvas.width) this.x = 0;
+        if (this.y < 0) this.y = canvas.height;
+        if (this.y > canvas.height) this.y = 0;
+      }
+      draw() {
+        ctx.fillStyle = 'yellow';
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size / 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      isHit(mx, my) {
+        return Math.hypot(mx - this.x, my - this.y) < this.size;
+      }
+    }
+
+    class Maggot {
+      constructor() {
+        this.x = Math.random() * canvas.width;
+        this.y = Math.random() * canvas.height;
+        this.size = 15;
+        this.angle = Math.random() * Math.PI * 2;
+      }
+      move() {
+        this.x += Math.cos(this.angle) * 1.5;
+        this.y += Math.sin(this.angle) * 1.5;
+        this.wrap();
+      }
+      wrap() {
+        if (this.x < 0) this.x = canvas.width;
+        if (this.x > canvas.width) this.x = 0;
+        if (this.y < 0) this.y = canvas.height;
+        if (this.y > canvas.height) this.y = 0;
+      }
+      draw() {
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size / 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      isHit(mx, my) {
+        return Math.hypot(mx - this.x, my - this.y) < this.size;
+      }
+    }
+
+    function setup() {
+      for (let i = 0; i < 3; i++) {
+        trashBags.push(new TrashBag(40 + i * 100, canvas.height - 120));
+      }
+      for (let i = 0; i < 10; i++) {
+        flies.push(new Fly());
+        maggots.push(new Maggot());
+      }
+      requestAnimationFrame(gameLoop);
+    }
+
+    function gameLoop() {
+      if (gameOver) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      trashBags.forEach(bag => bag.draw());
+      flies.forEach(fly => {
+        fly.move();
+        fly.draw();
+      });
+      maggots.forEach(maggot => {
+        maggot.move();
+        maggot.draw();
+      });
+      document.getElementById('score').textContent = `Score: ${score}`;
+      if (trashBags.every(b => b.hits >= 3)) {
+        gameOver = true;
+        gameOverSound.play();
+        ctx.fillStyle = 'red';
+        ctx.font = '36px sans-serif';
+        ctx.fillText('Game Over!', canvas.width / 2 - 100, canvas.height / 2);
+      } else {
+        requestAnimationFrame(gameLoop);
+      }
+    }
+
+    function handleSwat(mx, my) {
+      if (gameOver) return;
+      swatSound.play();
+      let hit = false;
+
+      flies = flies.filter(fly => {
+        if (fly.isHit(mx, my)) {
+          score += 50;
+          hitSound.play();
+          hit = true;
+          return false;
+        }
+        return true;
+      });
+
+      maggots = maggots.filter(maggot => {
+        if (maggot.isHit(mx, my)) {
+          score += 50;
+          hitSound.play();
+          hit = true;
+          return false;
+        }
+        return true;
+      });
+
+      trashBags.forEach(bag => {
+        if (bag.isHit(mx, my)) {
+          bag.hits++;
+          score -= 10;
+          hitSound.play();
+          hit = true;
+        }
+      });
+
+      if (!hit) {
+        score -= 5;
+      }
+    }
+
+    canvas.addEventListener('click', e => {
+      const rect = canvas.getBoundingClientRect();
+      handleSwat(e.clientX - rect.left, e.clientY - rect.top);
+    });
+
+    canvas.addEventListener('touchstart', e => {
+      const rect = canvas.getBoundingClientRect();
+      const touch = e.touches[0];
+      handleSwat(touch.clientX - rect.left, touch.clientY - rect.top);
+    });
+
+    setup();
   </script>
 </body>
 </html>
+
